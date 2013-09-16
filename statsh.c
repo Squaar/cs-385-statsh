@@ -1,10 +1,9 @@
 /*
 *  Matt Dumford
 *  mdumfo2@uic.edu
-* 
-*  Giving exactly 4 commands breaks 4th commands name in stats. It
-*  also breaks when freeing... but entering a 5th command fixes everything..........
-*/
+*
+*  look into ltermcap -- shell library for tab completiont
+*/ 
  
 #include <stdlib.h>
 #include <stdio.h>
@@ -46,8 +45,9 @@ int main(int argc, char **argv, char** envp){
 			//check if user wants to quit
 			if(!strcmp(in, "quit") || !strcmp(in, "exit") || !strcmp(in, "q")){
 				int j;
-				for(j=0; j<i; j++);
+				for(j=0; j<i; j++){
 					free(inputHistory[j]);
+				}
 				exit(0);
 			}
 			else if(!strcmp(in, "stats")){ //print stats
@@ -55,7 +55,7 @@ int main(int argc, char **argv, char** envp){
 					printf("No stats to display yet!\n");
 				else{
 					int j;
-					for(j=0; inputHistory[j]!=NULL; j++){
+					for(j=0; j<i; j++){
 						printf("%s\n", inputHistory[j]);
 						printf("\tUser time: %lu.%06lu (s)\n", rusageHistory[j].ru_utime.tv_sec, rusageHistory[j].ru_utime.tv_usec);
 						printf("\tSystem time: %lu.%06lu (s)\n", rusageHistory[j].ru_stime.tv_sec, rusageHistory[j].ru_stime.tv_usec);
@@ -63,6 +63,15 @@ int main(int argc, char **argv, char** envp){
 				}
 			}
 			else{ //tokenize and run exec
+			//	int numCommands = 0;
+			//	char *commands[50];
+			//	char *command = strtok(in, "|");
+
+			//	while(command != NULL){
+					
+				//}
+				
+
 				//tokenize input
 				int numToks = 0;
 				char *input[50];
@@ -78,10 +87,6 @@ int main(int argc, char **argv, char** envp){
 				//end the array with NULL	
 				input[numToks] = NULL;
 				
-				//int z;
-				//for(z=0; input[z] != NULL; z++)
-					//printf("%s\n", input[z]);
-			
 				pid_t pid = fork();
 
 				if(pid < 0){
