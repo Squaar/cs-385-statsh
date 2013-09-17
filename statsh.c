@@ -12,8 +12,12 @@
 #include <sys/time.h>
 #include <sys/resource.h>
 
+#define KGRN "\e[0;32m"
+#define KRED "\e[0;31m"
+#define KNRM "\e[0;0m"
+
 int main(int argc, char **argv, char** envp){
-	printf("Matt Dumford - mdumfo2\n");
+	printf(KGRN "Matt Dumford - mdumfo2\n");
 	
 	char *inputHistory[100];
 	struct rusage rusageHistory[100];
@@ -24,7 +28,7 @@ int main(int argc, char **argv, char** envp){
 		size_t inSize = 100;
 		int numChars;
 		
-		printf("\n> ");
+		printf(KNRM "> ");
 
 		//get input
 		numChars = getline(&in, &inSize, stdin);
@@ -36,7 +40,7 @@ int main(int argc, char **argv, char** envp){
 		}		
 	
 		if(numChars == -1){
-			printf("Error reading input");
+			printf(KRED "Error reading input");
 			exit(-1);
 		}
 		else if(numChars > 0){ //if the getline worked and the user actually gave input
@@ -51,13 +55,13 @@ int main(int argc, char **argv, char** envp){
 			}
 			else if(!strcmp(in, "stats")){ //print stats
 				if(i == 0)
-					printf("No stats to display yet!\n");
+					printf(KRED "No stats to display yet!\n");
 				else{
 					int j;
 					for(j=0; j<i; j++){
-						printf("%s\n", inputHistory[j]);
-						printf("\tUser time: %lu.%06lu (s)\n", rusageHistory[j].ru_utime.tv_sec, rusageHistory[j].ru_utime.tv_usec);
-						printf("\tSystem time: %lu.%06lu (s)\n", rusageHistory[j].ru_stime.tv_sec, rusageHistory[j].ru_stime.tv_usec);
+						printf(KNRM "%s\n", inputHistory[j]);
+						printf(KGRN "\tUser time: %lu.%06lu (s)\n", rusageHistory[j].ru_utime.tv_sec, rusageHistory[j].ru_utime.tv_usec);
+						printf(KGRN "\tSystem time: %lu.%06lu (s)\n", rusageHistory[j].ru_stime.tv_sec, rusageHistory[j].ru_stime.tv_usec);
 					}
 				}
 			}
@@ -76,7 +80,6 @@ int main(int argc, char **argv, char** envp){
 				
 				int j;				
 				for(j=0; j<numCommands; j++){
-	
 					//tokenize input
 					int numToks = 0;
 					char *input[50];
@@ -94,14 +97,14 @@ int main(int argc, char **argv, char** envp){
 					pid_t pid = fork();
 	
 					if(pid < 0){
-						printf("Error forking!");
+						printf(KRED "Error forking!");
 						exit(-1);
 					}
 					else if(pid == 0){ //child process
 						execvp(*input, input);
 		
 						//if exec returns and this runs, something broke.
-						printf("Command not found: %s\n", input[0]);
+						printf(KRED "Command not found: %s\n", input[0]);
 						exit(-1);
 					}
 					else{ //parent process
@@ -116,8 +119,8 @@ int main(int argc, char **argv, char** envp){
 							rusageHistory[i] = rusage;
 							i++;
 							
-							printf("\tUser time: %lu.%06lu (s)\n", rusage.ru_utime.tv_sec, rusage.ru_utime.tv_usec);
-							printf("\tSystem time: %lu.%06lu (s)\n\n", rusage.ru_stime.tv_sec, rusage.ru_stime.tv_usec);
+							printf(KGRN "\tUser time: %lu.%06lu (s)\n", rusage.ru_utime.tv_sec, rusage.ru_utime.tv_usec);
+							printf(KGRN "\tSystem time: %lu.%06lu (s)\n\n", rusage.ru_stime.tv_sec, rusage.ru_stime.tv_usec);
 						}
 					}
 				}
