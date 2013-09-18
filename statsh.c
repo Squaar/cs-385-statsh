@@ -15,12 +15,14 @@
 int main(int argc, char **argv, char** envp){
 	printf("Matt Dumford - mdumfo2\n");
 	
-	char *inputHistory[100];
-	struct rusage rusageHistory[100];
+	int inputHistorySize = sizeof(char *) * 100;
+	int rusageHistorySize = sizeof(struct rusage) * 100;
+	char **inputHistory = malloc(inputHistorySize);
+	struct rusage *rusageHistory = malloc(rusageHistorySize);
 	int i = 0;
 
 	while(1){
-		char *in;
+		char *in = NULL;
 		size_t inSize = 100;
 		int numChars;
 		
@@ -47,6 +49,8 @@ int main(int argc, char **argv, char** envp){
 				for(j=0; j<i; j++){
 					free(inputHistory[j]);
 				}
+				free(inputHistory);
+				free(rusageHistory);
 				exit(0);
 			}
 			else if(!strcmp(in, "stats")){ //print stats
@@ -63,10 +67,16 @@ int main(int argc, char **argv, char** envp){
 			}
 			else{ //tokenize and run exec
 				int numCommands = 0;
-				char *commands[50];
+				int commandsSize = sizeof(char *) * 50;
+				char **commands = malloc(commandsSize);
 				char *command = strtok(in, "|");
 
 				while(command != NULL){
+					if(numCommands == commandsSize/sizeof(char *)){
+						commandsSize *= 2;
+						commands =  realloc(commands, commandsSize); 
+					}
+
 					commands[numCommands] = command;
 					command = strtok(NULL, "|");
 					numCommands++;
@@ -79,10 +89,15 @@ int main(int argc, char **argv, char** envp){
 	
 					//tokenize input
 					int numToks = 0;
-					char *input[50];
+					int inputSize = sizeof(char *) * 50;
+					char **input = malloc(inputSize);
 					char *tok = strtok(commands[j], " ");
 					
 					while(tok != NULL){
+						if(numToks == inputSize/sizeof(char *)){
+							inputSize *= 2;
+							input = realloc(input, inputSize);
+						}
 						input[numToks] = tok;
 						tok = strtok(NULL, " ");
 						numToks++;
@@ -111,7 +126,16 @@ int main(int argc, char **argv, char** envp){
 						pid_t pid2 = wait4(pid, &status, 0, &rusage);
 						
 						if(pid2 != -1 && WIFEXITED(status) && !WEXITSTATUS(status)){
-							inputHistory[i] = (char *) malloc(strlen(commands[j]));
+							if(i == inputHistorySize/sizeof(char *) - 1){
+								inputHistorySize *= 2;
+								inputHistory = realloc(inputHistory, inputHistorySize);
+							}
+							if(i == rusageHistorySize/sizeof(struct rusage) - 1){
+								rusageHistorySize *= 2;
+								rusageHistory = realloc(rusageHistory, rusageHistorySize);
+							}
+
+							inputHistory[i] = malloc(strlen(commands[j]) * sizeof(char));
 							strcpy(inputHistory[i], commands[j]);
 							rusageHistory[i] = rusage;
 							i++;
@@ -120,8 +144,11 @@ int main(int argc, char **argv, char** envp){
 							printf("\tSystem time: %lu.%06lu (s)\n\n", rusage.ru_stime.tv_sec, rusage.ru_stime.tv_usec);
 						}
 					}
+					free(input);
 				}
+				free(commands);
 			}
 		}
+		free(in);
 	}
 }
