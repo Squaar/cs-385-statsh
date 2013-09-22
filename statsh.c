@@ -8,6 +8,7 @@
 #include <stdlib.h>
 #include <stdio.h>
 #include <string.h>
+#include <unistd.h>
 #include <sys/wait.h>
 #include <sys/time.h>
 #include <sys/resource.h>
@@ -65,7 +66,7 @@ int main(int argc, char **argv, char** envp){
 					}
 				}
 			}
-			else{ //tokenize and run exec
+			else{ //tokenize commands
 				int numCommands = 0;
 				int commandsSize = sizeof(char *) * 50;
 				char **commands = malloc(commandsSize);
@@ -83,10 +84,14 @@ int main(int argc, char **argv, char** envp){
 				}
 
 				commands[numCommands] = NULL;
-				
+
+				pid_t pids[numCommands];
+
+				//set up array of pipes
+				int pipes[numCommands-1][2];
+
 				int j;				
 				for(j=0; j<numCommands; j++){
-	
 					//tokenize input
 					int numToks = 0;
 					int inputSize = sizeof(char *) * 50;
@@ -98,54 +103,86 @@ int main(int argc, char **argv, char** envp){
 							inputSize *= 2;
 							input = realloc(input, inputSize);
 						}
+
 						input[numToks] = tok;
 						tok = strtok(NULL, " ");
 						numToks++;
 					} 
-					
+
 					//end the array with NULL	
 					input[numToks] = NULL;
 					
-					pid_t pid = fork();
+					//create current pipe
+					pipe(pipes[j]);
+
+					//fork new process
+					pids[j] = fork();
 	
-					if(pid < 0){
+					if(pids[j] < 0){
 						printf("Error forking!");
 						exit(-1);
 					}
-					else if(pid == 0){ //child process
+					else if(pids[j] == 0){ //CHILD PROCESS ----------- only first command is giving output... something is backwards
+						if(j != 0)
+							dup2(pipes[j-1][0], 0);
+						if(j != numCommands-1)
+							dup2(pipes[j][1], 1);
+
+						if(j == numCommands-1)
+							close(pipes[j][0]);
+						close(pipes[j-1][0]);
+						close(pipes[j][0]);
+						close(pipes[j][1]);
+
+						//execute current instruction
 						execvp(*input, input);
 		
 						//if exec returns and this runs, something broke.
 						printf("Command not found: %s\n", input[0]);
 						exit(-1);
 					}
-					else{ //parent process
-						struct rusage rusage;
-						int status;
-						
-						pid_t pid2 = wait4(pid, &status, 0, &rusage);
-						
-						if(pid2 != -1 && WIFEXITED(status) && !WEXITSTATUS(status)){
-							if(i == inputHistorySize/sizeof(char *) - 1){
-								inputHistorySize *= 2;
-								inputHistory = realloc(inputHistory, inputHistorySize);
-							}
-							if(i == rusageHistorySize/sizeof(struct rusage) - 1){
-								rusageHistorySize *= 2;
-								rusageHistory = realloc(rusageHistory, rusageHistorySize);
-							}
-
-							inputHistory[i] = malloc(strlen(commands[j]) * sizeof(char));
-							strcpy(inputHistory[i], commands[j]);
-							rusageHistory[i] = rusage;
-							i++;
-							
-							printf("\tUser time: %lu.%06lu (s)\n", rusage.ru_utime.tv_sec, rusage.ru_utime.tv_usec);
-							printf("\tSystem time: %lu.%06lu (s)\n\n", rusage.ru_stime.tv_sec, rusage.ru_stime.tv_usec);
-						}
+					else{ //PARENT PROCESS
+						//close off parent's end of pipe --------------- i dont think im closing the right things here... or anywhere.
+						if(j != 0)
+							close(pipes[j-1][0]);
+						if(j == numCommands-1)
+							close(pipes[j][0]);
+						close(pipes[j][1]);
 					}
 					free(input);
+
+				} //end commands loop
+
+				//loop and wait for each child
+				for(j=0; j<numCommands; j++){
+					printf("%s\n", commands[j]);
+
+					struct rusage rusage;
+					int status;
+					
+					pid_t pid2 = wait4(pids[j], &status, 0, &rusage);
+						
+					//if child process exited successfully
+					if(pid2 != -1 && WIFEXITED(status) && !WEXITSTATUS(status)){
+						if(i == inputHistorySize/sizeof(char *) - 1){
+							inputHistorySize *= 2;
+							inputHistory = realloc(inputHistory, inputHistorySize);
+						}
+						if(i == rusageHistorySize/sizeof(struct rusage) - 1){
+							rusageHistorySize *= 2;
+							rusageHistory = realloc(rusageHistory, rusageHistorySize);
+						}
+
+						inputHistory[i] = malloc(strlen(commands[j]) * sizeof(char));
+						strcpy(inputHistory[i], commands[j]);
+						rusageHistory[i] = rusage;
+						i++;
+							
+						printf("\tUser time: %lu.%06lu (s)\n", rusage.ru_utime.tv_sec, rusage.ru_utime.tv_usec);
+						printf("\tSystem time: %lu.%06lu (s)\n\n", rusage.ru_stime.tv_sec, rusage.ru_stime.tv_usec);
+					}
 				}
+
 				free(commands);
 			}
 		}
