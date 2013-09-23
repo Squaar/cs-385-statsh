@@ -122,7 +122,7 @@ int main(int argc, char **argv, char** envp){
 						printf("Error forking!");
 						exit(-1);
 					}
-					else if(pids[j] == 0){ //CHILD PROCESS ----------- only first command is giving output... something is backwards
+					else if(pids[j] == 0){ //CHILD PROCESS 
 						if(j != 0)
 							dup2(pipes[j-1][0], 0);
 						if(j != numCommands-1)
@@ -142,7 +142,6 @@ int main(int argc, char **argv, char** envp){
 						exit(-1);
 					}
 					else{ //PARENT PROCESS
-						//close off parent's end of pipe --------------- i dont think im closing the right things here... or anywhere.
 						if(j != 0)
 							close(pipes[j-1][0]);
 						if(j == numCommands-1)
@@ -155,13 +154,12 @@ int main(int argc, char **argv, char** envp){
 
 				//loop and wait for each child
 				for(j=0; j<numCommands; j++){
-					printf("%s\n", commands[j]);
 
 					struct rusage rusage;
 					int status;
 					
-					pid_t pid2 = wait4(pids[j], &status, 0, &rusage);
-						
+					pid_t pid2 = wait4(pids[j], &status, 0, &rusage);	
+
 					//if child process exited successfully
 					if(pid2 != -1 && WIFEXITED(status) && !WEXITSTATUS(status)){
 						if(i == inputHistorySize/sizeof(char *) - 1){
@@ -172,6 +170,8 @@ int main(int argc, char **argv, char** envp){
 							rusageHistorySize *= 2;
 							rusageHistory = realloc(rusageHistory, rusageHistorySize);
 						}
+
+						printf("%s\n", commands[j]);
 
 						inputHistory[i] = malloc(strlen(commands[j]) * sizeof(char));
 						strcpy(inputHistory[i], commands[j]);
