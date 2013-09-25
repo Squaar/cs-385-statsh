@@ -103,6 +103,12 @@ int main(int argc, char **argv, char** envp){
 
 				int j;				
 				for(j=0; j<numCommands; j++){
+					int readFile;
+					int writeFile;
+					int B_writeToFile;
+					int B_readFromFile;
+
+					printf("writefile: %i\n", writeFile);
 					int numFiles = 0;
 					char *files[10];
 					char *file = strtok(commands[j], "<>");
@@ -118,7 +124,8 @@ int main(int argc, char **argv, char** envp){
 					}
 					else if(numFiles == 2 && j == numCommands-1){ // last command, output into file.
 						files[1] = strtok(files[1], " "); // remove whitespace
-						pipes[j+1][0] = open(files[1], O_WRONLY|O_CREAT|O_TRUNC, 00666);
+						writeFile  = open(files[1], O_WRONLY|O_CREAT|O_TRUNC, 00666);
+						B_writeToFile = 1; //set write to file to true;
 					}
 					else if(numFiles == 3 && numCommands ==1){ // only command input and output to/from files.
 						
@@ -146,8 +153,7 @@ int main(int argc, char **argv, char** envp){
 					input[numToks] = NULL;
 					
 					//create current pipe
-					//if(j != numCommands-1)
-						pipe(pipes[j]);
+					pipe(pipes[j]);
 
 					//fork new process
 					pids[j] = fork();
@@ -161,6 +167,10 @@ int main(int argc, char **argv, char** envp){
 							dup2(pipes[j-1][0], 0);
 						if(j != numCommands-1)
 							dup2(pipes[j][1], 1);
+						if(j == numCommands-1 && B_writeToFile){
+							dup2(writeFile, 1);
+							close(writeFile);
+						}
 
 						if(j == numCommands-1)
 							close(pipes[j][0]);
@@ -181,6 +191,7 @@ int main(int argc, char **argv, char** envp){
 						if(j == numCommands-1)
 							close(pipes[j][0]);
 						close(pipes[j][1]);
+						writeFile = 0;
 					}
 					free(input);
 
