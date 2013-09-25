@@ -105,10 +105,14 @@ int main(int argc, char **argv, char** envp){
 				for(j=0; j<numCommands; j++){
 					int readFile;
 					int writeFile;
-					int B_writeToFile;
-					int B_readFromFile;
+					int B_writeToFile = 0;
+					int B_readFromFile = 0;
 
-					printf("writefile: %i\n", writeFile);
+					if(strchr(commands[j], '<') !=NULL)
+							B_readFromFile = 1;
+					if(strchr(commands[j], '>') !=NULL)
+							B_writeToFile = 1;
+
 					int numFiles = 0;
 					char *files[10];
 					char *file = strtok(commands[j], "<>");
@@ -119,16 +123,20 @@ int main(int argc, char **argv, char** envp){
 						numFiles++;
 					}
 
- 					if(numFiles == 2 && j == 0){ //first command, input through file.
-						
+ 					if(numFiles == 2 && j == 0 && B_readFromFile){ //first command, input through file.
+						files[1] = strtok(files[1], " ");
+						readFile = open(files[1], O_RDONLY);
+
 					}
-					else if(numFiles == 2 && j == numCommands-1){ // last command, output into file.
+					else if(numFiles == 2 && j == numCommands-1 && B_writeToFile){ // last command, output into file.
 						files[1] = strtok(files[1], " "); // remove whitespace
 						writeFile  = open(files[1], O_WRONLY|O_CREAT|O_TRUNC, 00666);
-						B_writeToFile = 1; //set write to file to true;
 					}
-					else if(numFiles == 3 && numCommands ==1){ // only command input and output to/from files.
-						
+					else if(numFiles == 3 && numCommands ==1 && B_readFromFile && B_writeToFile){ // only command input and output to/from files.
+						files[1] = strtok(files[1], " ");
+						files[2] = strtok(files[2], " ");
+						readFile = open(files[1], O_RDONLY);
+						writeFile = open(files[2], O_WRONLY|O_CREAT|O_TRUNC, 00666);
 					}
 					
 					
@@ -169,7 +177,9 @@ int main(int argc, char **argv, char** envp){
 							dup2(pipes[j][1], 1);
 						if(j == numCommands-1 && B_writeToFile){
 							dup2(writeFile, 1);
-							close(writeFile);
+						}
+						if(j == 0 && B_readFromFile){
+							dup2(readFile, 0);
 						}
 
 						if(j == numCommands-1)
@@ -192,6 +202,7 @@ int main(int argc, char **argv, char** envp){
 							close(pipes[j][0]);
 						close(pipes[j][1]);
 						writeFile = 0;
+						readFile = 0;
 					}
 					free(input);
 
