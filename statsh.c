@@ -3,6 +3,14 @@
 *  mdumfo2@uic.edu
 *
 *  look into ltermcap -- shell library for tab completiont
+*	pid = fork(); 
+*	if (pid == 0) { 
+*		fd = open("hello", O_RDONLY);
+*		dup2(fd, STDIN_FILENO);
+*		close(fd);
+*		fd = open("world", O_WRONLY|O_CREAT|O_TRUNC, S_IRWXU); 
+*		dup2(fd, STDOUT_FILENO );
+*		close(fd);
 */ 
  
 #include <stdlib.h>
@@ -11,6 +19,9 @@
 #include <unistd.h>
 #include <sys/wait.h>
 #include <sys/time.h>
+#include <sys/types.h>
+#include <sys/stat.h>
+#include <fcntl.h>
 #include <sys/resource.h>
 
 int main(int argc, char **argv, char** envp){
@@ -39,7 +50,7 @@ int main(int argc, char **argv, char** envp){
 		}		
 	
 		if(numChars == -1){
-			printf("Error reading input");
+			printf("Error reading input\n");
 			exit(-1);
 		}
 		else if(numChars > 0){ //if the getline worked and the user actually gave input
@@ -88,15 +99,37 @@ int main(int argc, char **argv, char** envp){
 				pid_t pids[numCommands];
 
 				//set up array of pipes
-				int pipes[numCommands-1][2];
+				int pipes[numCommands+1][2];
 
 				int j;				
 				for(j=0; j<numCommands; j++){
+					int numFiles = 0;
+					char *files[10];
+					char *file = strtok(commands[j], "<>");
+					
+					while(file !=NULL){
+						files[numFiles] = file;
+						file = strtok(NULL, "<>");
+						numFiles++;
+					}
+
+ 					if(numFiles == 2 && j == 0){ //first command, input through file.
+						
+					}
+					else if(numFiles == 2 && j == numCommands-1){ // last command, output into file.
+						files[1] = strtok(files[1], " "); // remove whitespace
+						pipes[j+1][0] = open(files[1], O_WRONLY|O_CREAT|O_TRUNC, 00666);
+					}
+					else if(numFiles == 3 && numCommands ==1){ // only command input and output to/from files.
+						
+					}
+					
+					
 					//tokenize input
 					int numToks = 0;
 					int inputSize = sizeof(char *) * 50;
 					char **input = malloc(inputSize);
-					char *tok = strtok(commands[j], " ");
+					char *tok = strtok(files[0], " ");
 					
 					while(tok != NULL){
 						if(numToks == inputSize/sizeof(char *)){
@@ -113,7 +146,8 @@ int main(int argc, char **argv, char** envp){
 					input[numToks] = NULL;
 					
 					//create current pipe
-					pipe(pipes[j]);
+					//if(j != numCommands-1)
+						pipe(pipes[j]);
 
 					//fork new process
 					pids[j] = fork();
