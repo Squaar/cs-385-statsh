@@ -19,9 +19,10 @@ int main(int argc, char **argv, char** envp){
 	
 	int inputHistorySize = sizeof(char *) * 100;
 	int rusageHistorySize = sizeof(struct rusage) * 100;
+	int backgroundPidsSize = sizeof(pid_t) * 100;
 	char **inputHistory = malloc(inputHistorySize);
 	struct rusage *rusageHistory = malloc(rusageHistorySize);
-	pid_t backgroundPids[100];
+	pid_t *backgroundPids = malloc(backgroundPidsSize);
 	int numBackgroundPids = 0; 
 	int i = 0;
 
@@ -50,11 +51,29 @@ int main(int argc, char **argv, char** envp){
 			//check if user wants to quit
 			if(!strcmp(in, "quit") || !strcmp(in, "exit") || !strcmp(in, "q")){
 				int j;
-				for(j=0; j<i; j++){
-					free(inputHistory[j]);
+				if(i==0)
+					printf("No stats to display!\n");
+				else{
+					int j;
+					for(j=0; j<i; j++){
+						printf("%s\n", inputHistory[j]);
+						printf("\tUser time: %lu.%06lu (s)\n", rusageHistory[j].ru_utime.tv_sec, rusageHistory[j].ru_utime.tv_usec);
+						printf("\tSystem time: %lu.%06lu (s)\n", rusageHistory[j].ru_stime.tv_sec, rusageHistory[j].ru_stime.tv_usec);
+					}
 				}
+
+				struct rusage shellRusage;
+				getrusage(RUSAGE_SELF, &shellRusage);
+				printf("Statsh\n");
+				printf("\tUser time: %lu.%06lu (s)\n", shellRusage.ru_utime.tv_sec, shellRusage.ru_utime.tv_usec);
+				printf("\tSystem time: %lu.%06lu (s)\n", shellRusage.ru_stime.tv_sec, shellRusage.ru_stime.tv_usec);
+
+
+				for(j=0; j<i; j++)
+					free(inputHistory[j]);
 				free(inputHistory);
 				free(rusageHistory);
+				free(backgroundPids);
 				exit(0);
 			}
 			else if(!strcmp(in, "stats")){ //print stats
@@ -164,6 +183,10 @@ int main(int argc, char **argv, char** envp){
 					//fork new process
 					pids[j] = fork();
 					if(B_background){
+						if(numBackgroundPids == backgroundPidsSize/sizeof(pid_t) - 1){
+							backgroundPidsSize *= 2;
+							backgroundPids = realloc(backgroundPids, backgroundPidsSize);
+						}
 						backgroundPids[numBackgroundPids] = pids[j];
 						numBackgroundPids++;
 					}
@@ -212,38 +235,39 @@ int main(int argc, char **argv, char** envp){
 				} //end commands loop
 
 				//loop and wait for each child
-				for(j=0; j<numCommands; j++){
+				if(!B_background){
+					for(j=0; j<numCommands; j++){
+	
+						struct rusage rusage;
+						int status;
+	
+						pid_t pid2 = wait4(pids[j], &status, 0, &rusage);	
+	
+						//if child process exited successfully
+						if(pid2 != -1 && WIFEXITED(status) && !WEXITSTATUS(status)){
+							if(i == inputHistorySize/sizeof(char *) - 1){
+								inputHistorySize *= 2;
+								inputHistory = realloc(inputHistory, inputHistorySize);
+							}
+							if(i == rusageHistorySize/sizeof(struct rusage) - 1){
+								rusageHistorySize *= 2;
+								rusageHistory = realloc(rusageHistory, rusageHistorySize);
+							}
 
-					struct rusage rusage;
-					int status;
-
-					pid_t pid2 = wait4(pids[j], &status, 0, &rusage);	
-
-					//if child process exited successfully
-					if(pid2 != -1 && WIFEXITED(status) && !WEXITSTATUS(status)){
-						if(i == inputHistorySize/sizeof(char *) - 1){
-							inputHistorySize *= 2;
-							inputHistory = realloc(inputHistory, inputHistorySize);
+							printf("%s\n", commands[j]);
+	
+							inputHistory[i] = malloc(strlen(commands[j]) * sizeof(char));
+							strcpy(inputHistory[i], commands[j]);
+							rusageHistory[i] = rusage;
+							i++;
+								
+							printf("\tUser time: %lu.%06lu (s)\n", rusage.ru_utime.tv_sec, rusage.ru_utime.tv_usec);
+							printf("\tSystem time: %lu.%06lu (s)\n\n", rusage.ru_stime.tv_sec, rusage.ru_stime.tv_usec);
 						}
-						if(i == rusageHistorySize/sizeof(struct rusage) - 1){
-							rusageHistorySize *= 2;
-							rusageHistory = realloc(rusageHistory, rusageHistorySize);
-						}
-
-						printf("%s\n", commands[j]);
-
-						inputHistory[i] = malloc(strlen(commands[j]) * sizeof(char));
-						strcpy(inputHistory[i], commands[j]);
-						rusageHistory[i] = rusage;
-						i++;
-							
-						printf("\tUser time: %lu.%06lu (s)\n", rusage.ru_utime.tv_sec, rusage.ru_utime.tv_usec);
-						printf("\tSystem time: %lu.%06lu (s)\n\n", rusage.ru_stime.tv_sec, rusage.ru_stime.tv_usec);
 					}
 				}
-				
-				for(j=0; j<numBackgroundPids; j++){
-					printf("backgrounds: %i\n", numBackgroundPids);
+
+				for(j=0; j<numBackgroundPids-1; j++){
 					struct rusage rusage;
 					int status;
 
@@ -260,13 +284,13 @@ int main(int argc, char **argv, char** envp){
 							rusageHistory = realloc(rusageHistory, rusageHistorySize);
 						}
 
-						printf("%s\n", commands[j]);
+						printf("Background Proccess\n");
 
-						inputHistory[i] = malloc(strlen(commands[j]) * sizeof(char));
-						strcpy(inputHistory[i], commands[j]);
+						inputHistory[i] = malloc(10 * sizeof(char));
+						sprintf(inputHistory[i], "%i", backgroundPids[j]);
 						rusageHistory[i] = rusage;
 						i++;
-							
+						
 						printf("\tUser time: %lu.%06lu (s)\n", rusage.ru_utime.tv_sec, rusage.ru_utime.tv_usec);
 						printf("\tSystem time: %lu.%06lu (s)\n\n", rusage.ru_stime.tv_sec, rusage.ru_stime.tv_usec);
 					}
