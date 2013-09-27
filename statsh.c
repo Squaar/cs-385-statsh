@@ -1,16 +1,6 @@
 /*
 *  Matt Dumford
 *  mdumfo2@uic.edu
-*
-*  look into ltermcap -- shell library for tab completiont
-*	pid = fork(); 
-*	if (pid == 0) { 
-*		fd = open("hello", O_RDONLY);
-*		dup2(fd, STDIN_FILENO);
-*		close(fd);
-*		fd = open("world", O_WRONLY|O_CREAT|O_TRUNC, S_IRWXU); 
-*		dup2(fd, STDOUT_FILENO );
-*		close(fd);
 */ 
  
 #include <stdlib.h>
@@ -31,6 +21,8 @@ int main(int argc, char **argv, char** envp){
 	int rusageHistorySize = sizeof(struct rusage) * 100;
 	char **inputHistory = malloc(inputHistorySize);
 	struct rusage *rusageHistory = malloc(rusageHistorySize);
+	pid_t backgroundPids[100];
+	int numBackgroundPids = 0; 
 	int i = 0;
 
 	while(1){
@@ -97,6 +89,12 @@ int main(int argc, char **argv, char** envp){
 				commands[numCommands] = NULL;
 
 				pid_t pids[numCommands];
+
+				int B_background = 0;
+				if(commands[numCommands-1][strlen(commands[numCommands-1])-1] == '&'){
+					commands[numCommands-1][strlen(commands[numCommands-1])-1] = '\0';
+					B_background = 1;
+				}
 
 				//set up array of pipes
 				int pipes[numCommands+1][2];
@@ -165,6 +163,10 @@ int main(int argc, char **argv, char** envp){
 
 					//fork new process
 					pids[j] = fork();
+					if(B_background){
+						backgroundPids[numBackgroundPids] = pids[j];
+						numBackgroundPids++;
+					}
 	
 					if(pids[j] < 0){
 						printf("Error forking!");
@@ -213,8 +215,38 @@ int main(int argc, char **argv, char** envp){
 
 					struct rusage rusage;
 					int status;
-					
+
 					pid_t pid2 = wait4(pids[j], &status, 0, &rusage);	
+
+					//if child process exited successfully
+					if(pid2 != -1 && WIFEXITED(status) && !WEXITSTATUS(status)){
+						if(i == inputHistorySize/sizeof(char *) - 1){
+							inputHistorySize *= 2;
+							inputHistory = realloc(inputHistory, inputHistorySize);
+						}
+						if(i == rusageHistorySize/sizeof(struct rusage) - 1){
+							rusageHistorySize *= 2;
+							rusageHistory = realloc(rusageHistory, rusageHistorySize);
+						}
+
+						printf("%s\n", commands[j]);
+
+						inputHistory[i] = malloc(strlen(commands[j]) * sizeof(char));
+						strcpy(inputHistory[i], commands[j]);
+						rusageHistory[i] = rusage;
+						i++;
+							
+						printf("\tUser time: %lu.%06lu (s)\n", rusage.ru_utime.tv_sec, rusage.ru_utime.tv_usec);
+						printf("\tSystem time: %lu.%06lu (s)\n\n", rusage.ru_stime.tv_sec, rusage.ru_stime.tv_usec);
+					}
+				}
+				
+				for(j=0; j<numBackgroundPids; j++){
+					printf("backgrounds: %i\n", numBackgroundPids);
+					struct rusage rusage;
+					int status;
+
+					pid_t pid2 = wait4(backgroundPids[j], &status, WNOHANG, &rusage);	
 
 					//if child process exited successfully
 					if(pid2 != -1 && WIFEXITED(status) && !WEXITSTATUS(status)){
