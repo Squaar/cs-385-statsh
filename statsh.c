@@ -173,20 +173,21 @@ int main(int argc, char **argv, char** envp){
 						exit(-1);
 					}
 					else if(pids[j] == 0){ //CHILD PROCESS 
-						if(j != 0)
+						if(j != 0){
 							dup2(pipes[j-1][0], 0);
-						if(j != numCommands-1)
-							dup2(pipes[j][1], 1);
-						if(j == numCommands-1 && B_writeToFile){
-							dup2(writeFile, 1);
+							close(pipes[j-1][0]);
 						}
-						if(j == 0 && B_readFromFile){
-							dup2(readFile, 0);
-						}
-
 						if(j == numCommands-1)
 							close(pipes[j][0]);
-						close(pipes[j-1][0]);
+						if(j != numCommands-1)
+							dup2(pipes[j][1], 1);
+
+						if(j == numCommands-1 && B_writeToFile)
+							dup2(writeFile, 1);
+						if(j == 0 && B_readFromFile)
+							dup2(readFile, 0);
+
+						
 						close(pipes[j][0]);
 						close(pipes[j][1]);
 
