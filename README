@@ -1,0 +1,7 @@
+Matt Dumford
+mdumfo2
+STATSH - README
+
+Statsh does not take any command line arguments.
+All input works as specified in the homework instructions.
+If a background process is given, it's pid will be printed instead of the command when the stats are printed.
